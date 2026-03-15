@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Letter Tetris 🌟</title>
+<title>Word Blocks 🌟</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -291,49 +291,6 @@ body {
 }
 #pause-badge.show { display: block; }
 
-/* ── Touch bar ─────────────────────────────── */
-#touch-bar {
-  display: flex;
-  background: var(--panel);
-  border-top: 2px solid var(--panel-border);
-  padding: 8px 8px 12px;
-  gap: 6px;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
-}
-
-.tbtn {
-  background: #fff;
-  border: 2px solid rgba(0,0,0,0.08);
-  border-radius: 14px;
-  box-shadow: 0 4px 0 rgba(0,0,0,0.10);
-  color: var(--text);
-  font-size: 22px;
-  width: 60px; height: 60px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
-  transition: transform 0.08s, box-shadow 0.08s;
-  font-family: 'Nunito', sans-serif;
-  font-weight: 900;
-  flex-shrink: 0;
-}
-.tbtn:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 rgba(0,0,0,0.10);
-}
-.tbtn.wide {
-  width: 78px;
-  font-size: 13px;
-  background: var(--accent);
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 4px 0 #c94f20;
-}
-.tbtn.wide:active { box-shadow: 0 1px 0 #c94f20; }
 </style>
 </head>
 <body>
@@ -343,7 +300,7 @@ body {
   <!-- TOP BAR -->
   <div id="top-bar">
     <div id="tb-r1">
-      <span id="game-title">⭐ Letter Tetris</span>
+      <span id="game-title">⭐ Word Blocks</span>
       <div id="tb-right">
         <span id="level-pill">Level <span id="level-val">1</span></span>
         <button id="mute-btn" title="Mute/Unmute">🔊</button>
@@ -381,14 +338,6 @@ body {
     <div id="pause-badge">⏸ PAUSED</div>
   </div>
 
-  <!-- TOUCH CONTROLS (always visible) -->
-  <div id="touch-bar">
-    <button class="tbtn" id="tb-left">◀</button>
-    <button class="tbtn" id="tb-rotate">↻</button>
-    <button class="tbtn wide" id="tb-drop">DROP</button>
-    <button class="tbtn" id="tb-down">▼</button>
-    <button class="tbtn" id="tb-right">▶</button>
-  </div>
 
 </div>
 
@@ -581,11 +530,10 @@ document.getElementById('mute-btn').addEventListener('click', toggleMute);
 //  CANVAS SIZING
 // ════════════════════════════════════════════════════
 function computeCell() {
-  const topH    = document.getElementById('top-bar').offsetHeight   || 88;
-  const wordH   = document.getElementById('word-band').offsetHeight  || 68;
-  const bottomH = document.getElementById('touch-bar').offsetHeight || 80;
-  const availH  = window.innerHeight - topH - wordH - bottomH - 4;
-  const availW  = Math.min(window.innerWidth, 440);
+  const topH  = document.getElementById('top-bar').offsetHeight  || 88;
+  const wordH = document.getElementById('word-band').offsetHeight || 68;
+  const availH = window.innerHeight - topH - wordH - 4;
+  const availW = Math.min(window.innerWidth, 440);
   return Math.max(20, Math.min(Math.floor(availW / COLS), Math.floor(availH / ROWS), 44));
 }
 
@@ -1113,53 +1061,52 @@ document.addEventListener('keydown', e => {
 // ════════════════════════════════════════════════════
 //  TOUCH INPUT
 // ════════════════════════════════════════════════════
-function bindBtn(id, fn) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.addEventListener('touchstart', e => { e.preventDefault(); fn(); }, { passive: false });
-  el.addEventListener('click', fn);
-}
+// Swipe on canvas — piece follows finger in real time
+let touchStartX = 0, touchStartY = 0, touchStartTime = 0, touchStartCol = 0;
 
-bindBtn('tb-left',   () => { if (!current||paused) return; if (isValid(current.shape,current.rotation,current.row,current.col-1)) current.col--; });
-bindBtn('tb-right',  () => { if (!current||paused) return; if (isValid(current.shape,current.rotation,current.row,current.col+1)) current.col++; });
-bindBtn('tb-rotate', () => {
-  if (!current||paused) return;
-  const rot = (current.rotation+1)%4;
-  for (const kick of [0,-1,1,-2,2]) {
-    if (isValid(current.shape,rot,current.row,current.col+kick)) {
-      current.rotation=rot; current.col+=kick; sfxRotate(); break;
-    }
-  }
-});
-bindBtn('tb-down',   () => {
-  if (!current||paused) return;
-  if (isValid(current.shape,current.rotation,current.row+1,current.col)) { current.row++; addScore(1); }
-  else lockPiece();
-});
-bindBtn('tb-drop',   () => {
-  if (!current||paused) return;
-  let d = 0;
-  while (isValid(current.shape,current.rotation,current.row+1,current.col)) { current.row++; d++; }
-  addScore(d*2); sfxDrop(); lockPiece();
-});
+canvas.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+  touchStartTime = Date.now();
+  touchStartCol = current ? current.col : 0;
+  e.preventDefault();
+}, { passive: false });
 
-// Swipe on canvas
-let tx0=0, ty0=0, tt0=0;
-canvas.addEventListener('touchstart', e => { tx0=e.touches[0].clientX; ty0=e.touches[0].clientY; tt0=Date.now(); e.preventDefault(); }, {passive:false});
-canvas.addEventListener('touchend', e => {
-  const dx=e.changedTouches[0].clientX-tx0, dy=e.changedTouches[0].clientY-ty0, dt=Date.now()-tt0;
-  if (!current||paused) return;
-  if (Math.abs(dx)<8&&Math.abs(dy)<8&&dt<220) {
-    const rot=(current.rotation+1)%4;
-    for (const kick of [0,-1,1,-2,2]) if (isValid(current.shape,rot,current.row,current.col+kick)) { current.rotation=rot; current.col+=kick; sfxRotate(); break; }
-  } else if (Math.abs(dx)>Math.abs(dy)*1.2) {
-    if (dx>18&&isValid(current.shape,current.rotation,current.row,current.col+1)) current.col++;
-    else if (dx<-18&&isValid(current.shape,current.rotation,current.row,current.col-1)) current.col--;
-  } else if (dy>30&&dt<260) {
-    let d=0; while (isValid(current.shape,current.rotation,current.row+1,current.col)){current.row++;d++;} addScore(d*2); sfxDrop(); lockPiece();
+canvas.addEventListener('touchmove', e => {
+  if (!current || paused || !gameRunning) return;
+  const dx = e.touches[0].clientX - touchStartX;
+  const targetCol = touchStartCol + Math.round(dx / CELL);
+  if (targetCol > current.col) {
+    if (isValid(current.shape, current.rotation, current.row, current.col + 1)) current.col++;
+  } else if (targetCol < current.col) {
+    if (isValid(current.shape, current.rotation, current.row, current.col - 1)) current.col--;
   }
   e.preventDefault();
-}, {passive:false});
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  if (!current || paused || !gameRunning) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const dt = Date.now() - touchStartTime;
+  // Tap → rotate
+  if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && dt < 200) {
+    const rot = (current.rotation + 1) % 4;
+    for (const kick of [0, -1, 1, -2, 2]) {
+      if (isValid(current.shape, rot, current.row, current.col + kick)) {
+        current.rotation = rot; current.col += kick; sfxRotate(); break;
+      }
+    }
+  }
+  // Fast swipe down → hard drop
+  else if (dy > 50 && dt < 350 && dy > Math.abs(dx)) {
+    let d = 0;
+    while (isValid(current.shape, current.rotation, current.row + 1, current.col)) { current.row++; d++; }
+    addScore(d * 2); sfxDrop(); lockPiece();
+  }
+  e.preventDefault();
+}, { passive: false });
 
 // ════════════════════════════════════════════════════
 //  INIT
