@@ -28,7 +28,12 @@ html, body {
 }
 
 body {
-  background: linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 100%);
+  background:
+    radial-gradient(circle at 15% 85%, rgba(255,107,157,0.55) 0%, transparent 38%),
+    radial-gradient(circle at 85% 15%, rgba(167,139,250,0.55) 0%, transparent 38%),
+    radial-gradient(circle at 78% 80%, rgba(251,191,36,0.45) 0%, transparent 32%),
+    radial-gradient(circle at 22% 20%, rgba(61,214,245,0.45) 0%, transparent 32%),
+    linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #1e3a5f 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -183,14 +188,12 @@ body {
   flex: 1;
   overflow: hidden;
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 #board {
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
 }
 
 /* ── Next piece overlay (top-right of board) ── */
@@ -330,7 +333,7 @@ body {
     </div>
 
     <div id="overlay">
-      <div class="ov-title">⭐ Letter Tetris</div>
+      <div class="ov-title">⭐ Word Blocks</div>
       <div class="ov-sub">Spell the word in a straight line to win!<br>Place letters left→right or top→bottom on the board</div>
       <button class="play-btn" id="play-btn">PLAY!</button>
     </div>
@@ -346,7 +349,13 @@ body {
 // ════════════════════════════════════════════════════
 //  CONSTANTS
 // ════════════════════════════════════════════════════
-const COLS = 10, ROWS = 20;
+function wordConfig(len) {
+  if (len <= 3) return { cols: 7,  rows: 10 };
+  if (len <= 5) return { cols: 8,  rows: 12 };
+  if (len <= 6) return { cols: 9,  rows: 14 };
+  return         { cols: 10, rows: 16 };
+}
+let visCols = 7, visRows = 10;
 
 const WORDS = [
   'CAT','DOG','SUN','RUN',
@@ -534,7 +543,7 @@ function computeCell() {
   const wordH = document.getElementById('word-band').offsetHeight || 68;
   const availH = window.innerHeight - topH - wordH - 4;
   const availW = Math.min(window.innerWidth, 440);
-  return Math.max(20, Math.min(Math.floor(availW / COLS), Math.floor(availH / ROWS), 44));
+  return Math.max(18, Math.min(Math.floor(availW / visCols), Math.floor(availH / visRows)));
 }
 
 let CELL = 28; // placeholder until DOM ready
@@ -545,8 +554,8 @@ const nCtx      = nextCanvas.getContext('2d');
 
 function resizeCanvas() {
   CELL = computeCell();
-  canvas.width  = COLS * CELL;
-  canvas.height = ROWS * CELL;
+  canvas.width  = visCols * CELL;
+  canvas.height = visRows * CELL;
 }
 
 window.addEventListener('resize', () => { resizeCanvas(); render(); });
@@ -570,12 +579,12 @@ let comboList = [];
 // ════════════════════════════════════════════════════
 //  BOARD HELPERS
 // ════════════════════════════════════════════════════
-const emptyBoard = () => Array.from({length: ROWS}, () => Array(COLS).fill(null));
+const emptyBoard = () => Array.from({length: visRows}, () => Array(visCols).fill(null));
 
 function isValid(shape, rot, row, col) {
   for (const [dr, dc] of SHAPES[shape][rot]) {
     const nr = row + dr, nc = col + dc;
-    if (nr >= ROWS || nc < 0 || nc >= COLS) return false;
+    if (nr >= visRows || nc < 0 || nc >= visCols) return false;
     if (nr >= 0 && board[nr][nc]) return false;
   }
   return true;
@@ -610,7 +619,7 @@ function nextLetter() {
 function randomPiece() {
   const shape  = SHAPE_KEYS[Math.floor(Math.random() * SHAPE_KEYS.length)];
   const letter = nextLetter();
-  return { shape, rotation: 0, row: 0, col: Math.floor((COLS - 4) / 2), letter, color: LC[letter] };
+  return { shape, rotation: 0, row: 0, col: Math.floor((visCols - 4) / 2), letter, color: LC[letter] };
 }
 
 // ════════════════════════════════════════════════════
@@ -699,10 +708,10 @@ function drawGrid() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = 'rgba(150,170,220,0.18)';
   ctx.lineWidth = 0.5;
-  for (let r = 0; r <= ROWS; r++) {
+  for (let r = 0; r <= visRows; r++) {
     ctx.beginPath(); ctx.moveTo(0, r * CELL); ctx.lineTo(canvas.width, r * CELL); ctx.stroke();
   }
-  for (let c = 0; c <= COLS; c++) {
+  for (let c = 0; c <= visCols; c++) {
     ctx.beginPath(); ctx.moveTo(c * CELL, 0); ctx.lineTo(c * CELL, canvas.height); ctx.stroke();
   }
 }
@@ -710,8 +719,8 @@ function drawGrid() {
 function render() {
   drawGrid();
 
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
+  for (let r = 0; r < visRows; r++) {
+    for (let c = 0; c < visCols; c++) {
       const d = board[r][c];
       if (!d) continue;
       const key = `${r}_${c}`;
@@ -734,13 +743,13 @@ function render() {
     if (ghostRow > current.row) {
       for (const [dr, dc] of SHAPES[current.shape][current.rotation]) {
         const r = ghostRow + dr, c = current.col + dc;
-        if (r >= 0 && r < ROWS && c >= 0 && c < COLS)
+        if (r >= 0 && r < visRows && c >= 0 && c < visCols)
           drawCell(ctx, c, r, CELL, current.letter, false, true, false, 1);
       }
     }
     for (const [dr, dc] of SHAPES[current.shape][current.rotation]) {
       const r = current.row + dr, c = current.col + dc;
-      if (r >= 0 && r < ROWS && c >= 0 && c < COLS)
+      if (r >= 0 && r < visRows && c >= 0 && c < visCols)
         drawCell(ctx, c, r, CELL, current.letter, true, false, false, 1);
     }
   }
@@ -798,10 +807,10 @@ function showCombo(text, color) {
 // ════════════════════════════════════════════════════
 function clearLines() {
   let cleared = 0;
-  for (let r = ROWS - 1; r >= 0; r--) {
+  for (let r = visRows - 1; r >= 0; r--) {
     if (board[r].every(c => c !== null)) {
       board.splice(r, 1);
-      board.unshift(Array(COLS).fill(null));
+      board.unshift(Array(visCols).fill(null));
       cleared++; r++;
     }
   }
@@ -821,12 +830,12 @@ function clearLines() {
 // ════════════════════════════════════════════════════
 function checkWordBuilt() {
   const w = WORDS[levelIdx], len = w.length;
-  for (let r = 0; r < ROWS; r++)
-    for (let c = 0; c <= COLS - len; c++)
+  for (let r = 0; r < visRows; r++)
+    for (let c = 0; c <= visCols - len; c++)
       if (w.split('').every((ch,i) => board[r][c+i]?.letter === ch))
         return { cells: w.split('').map((_,i) => [r, c+i]) };
-  for (let c = 0; c < COLS; c++)
-    for (let r = 0; r <= ROWS - len; r++)
+  for (let c = 0; c < visCols; c++)
+    for (let r = 0; r <= visRows - len; r++)
       if (w.split('').every((ch,i) => board[r+i][c]?.letter === ch))
         return { cells: w.split('').map((_,i) => [r+i, c]) };
   return null;
@@ -846,8 +855,11 @@ function winLevel(cells) {
     flashSet.clear();
     levelIdx++;
     if (levelIdx >= WORDS.length) { youWin(); return; }
-    board = emptyBoard();
     level = Math.max(level, levelIdx + 1);
+    const cfg = wordConfig(WORDS[levelIdx].length);
+    visCols = cfg.cols; visRows = cfg.rows;
+    board = emptyBoard();
+    resizeCanvas();
     buildColorMap(WORDS[levelIdx]);
     buildWordDisplay();
     updateHUD();
@@ -897,8 +909,8 @@ function updateWordDisplay() {
   const chips = document.getElementById('word-chips');
   if (!chips) return;
   const present = new Set();
-  for (let r = 0; r < ROWS; r++)
-    for (let c = 0; c < COLS; c++)
+  for (let r = 0; r < visRows; r++)
+    for (let c = 0; c < visCols; c++)
       if (board[r][c]) present.add(board[r][c].letter);
   Array.from(chips.children).forEach((chip, i) => {
     const ch = word[i];
@@ -968,8 +980,11 @@ function gameOver() {
 }
 
 function startGame() {
-  board = emptyBoard();
   score = 0; level = 1; lines = 0; levelIdx = 0;
+  const cfg = wordConfig(WORDS[0].length);
+  visCols = cfg.cols; visRows = cfg.rows;
+  board = emptyBoard();
+  resizeCanvas();
   current = null; nextPiece = null;
   winPending = false; letterBag = [];
   flashSet.clear(); comboList.length = 0;
